@@ -13,3 +13,9 @@ services:
       - "6379:6379"
     volumes:
       - "./storage:/data/re"
+    
+  web:
+    build: .
+    depends_on:
+      - mongo
+      - redis

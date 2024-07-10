@@ -21,12 +21,17 @@ class OrderService(orderManager: OrderManager) {
     val order = orderManager.getOrder(orderId)
     val status: Future[Option[DiagramStatus]] = order.transform {
       case Success(result) =>
+        println(result)
         result.orderStatus match {
           case "Preparation" => Success(Some(DiagramStatus.OrderTracking()))
           case "Finished"    => Success(Some(DiagramStatus.SetComplaint()))
           case _             => Success(None)
         }
-      case Failure(ex) => Success(None)
+      case Failure(ex) =>
+        println("ex in orderService")
+        println(orderId)
+        println(ex)
+        Success(None)
 
     }
     return status

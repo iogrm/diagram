@@ -13,9 +13,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.annotation.switch
 import demo.api.dto.DiagramDto
 import demo.model.DiagramStatus
-import demo.model.DiagramMessage
 import demo.api.dto.AddComplaint
 import demo.model.OrderId
+import demo.config.Diagram
 
 class DiagramService(
     complaintService: ComplaintService,
@@ -29,15 +29,22 @@ class DiagramService(
   ): Future[DiagramDto.Result] = {
     val userState = redisRepo.get(userId)
 
-    print(userState)
+    println(userState)
     userState match {
       case Some(data) => {
         val state = data.parseJson.convertTo[DiagramState]
         state.currentStatus match {
+
           case DiagramStatus.ReceiveOrderNumber() =>
             goNextState(state.copy(orderId = Some(OrderId(param.message))))
             command(userId, param)
+
           case DiagramStatus.OrderStatus() =>
+            if (state.orderId == None) {
+              goToStartState(state)
+              return sendMessage(Diagram.Message.OrderStatusNone())
+            }
+
             for {
               status <- orderService
                 .getOrderStatus(
@@ -46,28 +53,31 @@ class DiagramService(
               newState = goNextState(state.copy(orderStatus = status))
               message <- status match {
                 case Some(DiagramStatus.SetComplaint()) =>
-                  sendMessage(DiagramMessage.OrderStatusComplaint())
+                  sendMessage(Diagram.Message.OrderStatusComplaint())
                 case Some(DiagramStatus.OrderTracking()) =>
-                  sendMessage(DiagramMessage.OrderStatusPreparation())
+                  sendMessage(Diagram.Message.OrderStatusPreparation())
                 case None =>
-                  sendMessage(DiagramMessage.OrderStatusNone())
+                  goToStartState(state)
+                  sendMessage(Diagram.Message.OrderStatusNone())
               }
             } yield message
 
           case DiagramStatus.SetComplaint() =>
             complaintService.addComplaint(AddComplaint.Param(param.message))
             goNextState(state)
-            sendMessage(DiagramMessage.ComplaintSaved())
+            sendMessage(Diagram.Message.ComplaintSaved())
 
           case DiagramStatus.OrderTracking() =>
             goNextState(state)
-            sendMessage(DiagramMessage.OrderTracking())
+            sendMessage(Diagram.Message.OrderTracking())
 
           case DiagramStatus.End() =>
             param.message match {
-              case "start" => command(userId, param)
+              case "start" =>
+                goToStartState(state)
+                sendMessage(Diagram.Message.Start())
               case _ =>
-                sendMessage(DiagramMessage.End())
+                sendMessage(Diagram.Message.End())
 
             }
 
@@ -79,21 +89,15 @@ class DiagramService(
             goNextState(
               new DiagramState(userId, DiagramStatus.Start(), None, None)
             )
-            sendMessage(DiagramMessage.Start())
+            sendMessage(Diagram.Message.Start())
           }
           case _ =>
-            sendMessage(DiagramMessage.Error())
+            sendMessage(Diagram.Message.Error())
 
         }
       }
     }
 
-  }
-
-  def start(userId: UserId): DiagramState = {
-    val state = new DiagramState(userId, DiagramStatus.Start(), None, None)
-    redisRepo.set(state.userId, state.toJson)
-    state
   }
 
   def goNextState(state: DiagramState): Option[DiagramState] = {
@@ -110,44 +114,33 @@ class DiagramService(
       case None => None
     }
   }
+  def goToStartState(
+      state: DiagramState
+  ): Option[DiagramState] = {
+    goNextState(
+      state.copy(
+        currentStatus = DiagramStatus.Start()
+      )
+    )
+  }
 
   def getNextStep(state: DiagramState): Option[DiagramStatus] = {
     state.currentStatus match {
       case DiagramStatus.OrderStatus() => state.orderStatus
       case _ =>
-        nextStep.get(state.currentStatus)
+        Diagram.nextStep.get(state.currentStatus)
     }
   }
 
-  def sendMessage(tag: DiagramMessage): Future[DiagramDto.Result] = {
-    val message = messages.get(tag) match {
-      case None        => s"we don't have tag: ${tag} in sending Message"
+  def sendMessage(tag: Diagram.Message): Future[DiagramDto.Result] = {
+    val message = Diagram.message.get(tag) match {
+      case None =>
+        throw new Exception(
+          s"we don't have tag: ${tag} in sending Message"
+        )
       case Some(value) => value
     }
     Future.successful(DiagramDto.Result(message))
   }
-
-  val messages: Map[DiagramMessage, String] =
-    Map.apply(
-      DiagramMessage.Start() -> "شماره سفارش خود را وارد نمایید",
-      DiagramMessage.OrderTracking() -> "سفارش شما در حال پیگیری است",
-      DiagramMessage
-        .OrderStatusComplaint() -> "در صورتی از خدمات ارائه شده راضی نبودید، شکایت خود را مطرح نمایید",
-      DiagramMessage
-        .OrderStatusPreparation() -> "سفارش شما در حال پیگیری است",
-      DiagramMessage
-        .OrderStatusNone() -> "چنین شماره سفارشی در سیستم موجود نمیباشد",
-      DiagramMessage.ComplaintSaved() -> "شکایت شما در اسرع وقت بررسی میشود",
-      DiagramMessage.End() -> "اگر مایل به شروع دوباره هستید شروع را بزنید.",
-      DiagramMessage.Error() -> "اگر مایه به شروع هستید بنویسید start."
-    )
-
-  val nextStep: Map[DiagramStatus, DiagramStatus] =
-    Map.apply(
-      DiagramStatus.Start() -> DiagramStatus.ReceiveOrderNumber(),
-      DiagramStatus.ReceiveOrderNumber() -> DiagramStatus.OrderStatus(),
-      DiagramStatus.SetComplaint() -> DiagramStatus.End(),
-      DiagramStatus.OrderTracking() -> DiagramStatus.End()
-    )
 
 }
