@@ -5,6 +5,7 @@ import demo.api.dto.GetMessage
 import demo.api.dto.AllMessage
 import spray.json.DefaultJsonProtocol._
 import demo.state.persist.MessageEntity
+import demo.model.Message
 
 object AllMessageJsonSupport {
 
@@ -35,5 +36,14 @@ object MessageJsonSupport {
 
   implicit val resultHandler: RootJsonFormat[MessageEntity] = jsonFormat5(
     MessageEntity
+  )
+}
+
+object MessageAnalyzeJsonSupport {
+
+  import StateIdJsonSupport.formatStateId
+
+  implicit val handler: RootJsonFormat[Message.Analyze] = jsonFormat2(
+    Message.Analyze
   )
 }

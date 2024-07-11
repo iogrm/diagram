@@ -11,6 +11,7 @@ import demo.model.MessageId
 import demo.model.DiagramId
 import demo.state.persist.MessageEntity
 import demo.model.StateId
+import demo.model.Message
 
 class MessageRepo(connector: MongoConnector) {
 
@@ -37,6 +38,14 @@ class MessageRepo(connector: MongoConnector) {
       .find(BSONDocument("stateId" -> stateId))
       .cursor[MessageEntity]()
       .collect[List](-1, Cursor.FailOnError[List[MessageEntity]]())
+  }
+
+  def getCountMessage(stateId: StateId)(implicit
+      ec: ExecutionContext
+  ) = {
+    col
+      .count(Some(BSONDocument("stateId" -> stateId)))
+      .map(count => Message.Count(stateId, count))
   }
 
   def getAll()(implicit ec: ExecutionContext): Future[List[MessageEntity]] = {

@@ -23,6 +23,7 @@ import demo.state.persist.MessageEntity
 import demo.model.MessageId
 import demo.api.dto.AllMessage
 import demo.api.dto.GetMessage
+import demo.model.Message
 
 class StateService(
     redisRepo: RedisClient,
@@ -54,20 +55,20 @@ class StateService(
             case Some(state) =>
               println("state: ")
               println(state)
+              recordState(
+                MessageEntity(
+                  MessageId(randomId),
+                  userId,
+                  diagramId,
+                  state._id,
+                  param.message
+                )
+              )
               if (state.end)
                 Future(state.response.get)
               else
                 state.tag match {
                   case "State" => {
-                    recordState(
-                      MessageEntity(
-                        MessageId(randomId),
-                        userId,
-                        diagramId,
-                        state._id,
-                        param.message
-                      )
-                    )
                     setState(CacheState(userId, state.next.get, diagramId))
                     Future(state.response.get)
                   }
@@ -98,6 +99,15 @@ class StateService(
           val state = stateOption.get
           setState(CacheState(userId, state.next.get, diagramId))
           val message = state.response.get
+          recordState(
+            MessageEntity(
+              MessageId(randomId),
+              userId,
+              diagramId,
+              state._id,
+              param.message
+            )
+          )
           Future(message)
         })
 
@@ -144,10 +154,39 @@ class StateService(
   def getComplaints()(implicit
       ec: ExecutionContext
   ): Future[AllMessage.Result] = {
+    getEndPoints()
     for {
-      messages <- messageRepo.getAllByStateId(StateId("3"))
+      messages <- messageRepo.getAllByStateId(StateId("1"))
     } yield AllMessage.Result(messages)
+  }
 
+  def getEndPoints()(implicit
+      ec: ExecutionContext
+  ): Future[List[Message.Analyze]] = {
+    val statesFuture = stateRepo.getAllEndByDiagramId(DiagramId("1"))
+
+    val x = statesFuture
+      .flatMap(states =>
+        Future.sequence(
+          states
+            .map(state => state._id)
+            .map(id => messageRepo.getCountMessage(id))
+        )
+      )
+      .map(getAnalytics)
+    x
+  }
+
+  def getAnalytics(list: List[Message.Count]): List[Message.Analyze] = {
+    val sum = list.map(a => a.count).reduce((a, b) => a + b)
+    def check(a: Long, b: Long): Double = {
+      b match {
+        case 0 => 0
+        case _ => a.toDouble / b.toDouble
+      }
+    }
+    val d = list.map(mc => Message.Analyze(mc.stateId, check(mc.count, sum)))
+    d
   }
 
   def init(implicit

@@ -43,6 +43,7 @@ class StateController(service: StateService) {
         }
       case None => complete(s"No user was provided")
     }
+
   private val complaintRoute: Route =
     pathPrefix("api" / "diagram") {
       path("complaint") {
@@ -55,6 +56,18 @@ class StateController(service: StateService) {
       }
     }
 
-  val route = complaintRoute ~ diagramRoute
+  private val endPointRoute: Route =
+    pathPrefix("api" / "diagram") {
+      path("end") {
+        get {
+          import demo.json.MessageAnalyzeJsonSupport.handler
+          complete(
+            service.getEndPoints()
+          )
+        }
+      }
+    }
+
+  val route = endPointRoute ~ complaintRoute ~ diagramRoute
 
 }

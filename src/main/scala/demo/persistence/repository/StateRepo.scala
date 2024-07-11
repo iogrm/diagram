@@ -34,6 +34,15 @@ class StateRepo(connector: MongoConnector) {
     col.find(query).one[StateEntity]
   }
 
+  def getAllEndByDiagramId(diagramId: DiagramId)(implicit
+      ec: ExecutionContext
+  ): Future[List[StateEntity]] = {
+    col
+      .find(BSONDocument("diagramId" -> diagramId, "end" -> true))
+      .cursor[StateEntity]()
+      .collect[List](-1, Cursor.FailOnError[List[StateEntity]]())
+  }
+
   def getAll()(implicit ec: ExecutionContext): Future[List[StateEntity]] = {
     col
       .find(BSONDocument())
