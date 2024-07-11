@@ -15,7 +15,6 @@ import demo.model.DiagramId
 import spray.json._
 import DefaultJsonProtocol._
 import demo.state.persist.StateEntity
-import demo.json.StateJsonSupport.format
 import demo.json.CacheStateJsonSupport.format
 import demo.manager.RequestManager
 import demo.model.CacheState
@@ -25,6 +24,104 @@ class StateService(
     repo: StateRepo,
     manager: RequestManager
 ) {
+
+  def command(userId: UserId, diagramId: DiagramId, param: DiagramDto.Param)(
+      implicit ec: ExecutionContext
+  ): Future[String] = {
+
+    val cacheData = redisRepo.get(userId)
+    println("-------------------------------------------")
+    println("cacheData: ")
+    println(cacheData)
+    cacheData match {
+      case Some(data) => {
+
+        import demo.json.CacheStateJsonSupport.format
+        val cacheState = data.parseJson.convertTo[CacheState]
+        println("cacheState: ")
+        println(cacheState)
+        val stateFuture = getState(cacheState.stateId)
+        stateFuture.flatMap(stateOption => {
+          println("stateOption: ")
+          println(stateOption)
+          stateOption match {
+            case Some(state) =>
+              println("state: ")
+              println(state)
+              if (state.end)
+                Future(state.response.get)
+              else
+                state.tag match {
+                  case "State" => {
+                    recordState(state)
+                    setState(CacheState(userId, state.next.get, diagramId))
+                    Future(state.response.get)
+                  }
+                  case "Condition" => {
+                    val result =
+                      manager.request(state.callback.get, param.message)
+                    for {
+                      something <- result
+                      id = something.id
+                      str <- {
+                        setState(CacheState(userId, id, diagramId))
+                        command(userId, diagramId, param)
+                      }
+                    } yield str
+                  }
+                }
+          }
+        })
+      }
+      case None => {
+        val startState = repo.getStartState(diagramId)
+        startState.andThen(x => {
+          println("startState: ")
+          println(x)
+        })
+
+        startState.flatMap(stateOption => {
+          val state = stateOption.get
+          setState(CacheState(userId, state.next.get, diagramId))
+          val message = state.response.get
+          Future(message)
+        })
+
+      }
+    }
+
+  }
+
+  def addState(state: StateEntity)(implicit
+      ec: ExecutionContext
+  ): Future[AddState.Result] = {
+
+    for {
+      _ <- repo.insert(state)
+    } yield AddState.Result(state._id)
+
+  }
+
+  def recordState(state: StateEntity) {}
+  def setState(state: CacheState) {
+    redisRepo.set(
+      state.userId,
+      state.toJson
+    )
+  }
+
+  def getState(stateId: StateId)(implicit
+      ec: ExecutionContext
+  ): Future[Option[StateEntity]] = {
+    repo.getOne(stateId)
+
+  }
+
+  def getAll()(implicit
+      ec: ExecutionContext
+  ): Future[List[StateEntity]] = {
+    repo.getAll()
+  }
 
   def init(implicit
       ec: ExecutionContext
@@ -79,7 +176,7 @@ class StateService(
       "orderStatus",
       Some(message4),
       None,
-      Some("http://localhost:8000/api/order/"),
+      Some("http://localhost:8000/api/test/"),
       false,
       false
     )
@@ -101,101 +198,6 @@ class StateService(
     addState(receive)
     println("data init")
 
-  }
-
-  def command(userId: UserId, diagramId: DiagramId, param: DiagramDto.Param)(
-      implicit ec: ExecutionContext
-  ): Future[String] = {
-
-    val cacheData = redisRepo.get(userId)
-
-    println("cacheData: ")
-    println(cacheData)
-    cacheData match {
-      case Some(data) => {
-
-        import demo.json.CacheStateJsonSupport.format
-        val cacheState = data.parseJson.convertTo[CacheState]
-        println("cacheState: ")
-        println(cacheState)
-        val stateFuture = getState(cacheState.stateId)
-        stateFuture.flatMap(stateOption => {
-          println("stateOption: ")
-          println(stateOption)
-          stateOption match {
-            case Some(state) =>
-              println("state: ")
-              println(state)
-              state.tag match {
-                case "State" => {
-                  recordState(state)
-                  setState(CacheState(userId, state.next.get, diagramId))
-                  Future(state.response.get)
-                }
-                case "Condition" => {
-                  val result =
-                    manager.request(state.callback.get, param.message)
-                  for {
-                    something <- result
-                    id = something.id
-                    str <- {
-                      setState(CacheState(userId, id, diagramId))
-                      command(userId, diagramId, param)
-                    }
-                  } yield str
-                }
-              }
-          }
-        })
-      }
-      case None => {
-        val startState = repo.getStartState(diagramId)
-        startState.andThen(x => {
-          println("startState: ")
-          println(x)
-        })
-
-        startState.flatMap(stateOption => {
-          val state = stateOption.get
-          setState(CacheState(userId, state.next.get, diagramId))
-          val message = state.response.get
-          Future(message)
-        })
-
-      }
-    }
-
-  }
-
-  def addState(state: StateEntity)(implicit
-      ec: ExecutionContext
-  ): Future[AddState.Result] = {
-
-    for {
-      _ <- repo.insert(state)
-    } yield AddState.Result(state._id)
-
-  }
-
-  def recordState(state: StateEntity) {}
-  def setState(state: CacheState) {
-    redisRepo.set(
-      state.userId,
-      state
-    )
-  }
-
-  def getState(stateId: StateId)(implicit
-      ec: ExecutionContext
-  ): Future[Option[StateEntity]] = {
-    repo.getOne(stateId)
-
-  }
-
-  def getAll()(implicit
-      ec: ExecutionContext
-  ): Future[List[StateEntity]] = {
-    repo.getAll()
   }
 
   def randomId = UUID.randomUUID().toString()
