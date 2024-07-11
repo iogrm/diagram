@@ -1,5 +1,5 @@
 package demo.api.dto
-import demo.model.ComplaintId
+import demo.model.StateId
 
 object DiagramDto {
 

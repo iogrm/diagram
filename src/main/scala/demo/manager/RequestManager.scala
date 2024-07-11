@@ -12,30 +12,29 @@ import akka.stream.ActorMaterializer
 import scala.concurrent.duration._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-import demo.model.OrderId
-import demo.api.dto.GetOrder
+import demo.api.dto.GetRequest
 
-class OrderManager() {
-  val baseUrl = "http://localhost:8000/api/order/"
+class RequestManager() {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val meteralizer: ActorMaterializer = ActorMaterializer()
   import system.dispatcher
 
-  def getOrder(
-      id: OrderId
-  ): Future[GetOrder.Result] = {
+  def request(
+      url: String,
+      message: String
+  ): Future[GetRequest.Result] = {
 
     val request = HttpRequest(
       method = HttpMethods.GET,
-      uri = baseUrl + id.value
+      uri = url + message
     )
     import system.dispatcher
 
-    import demo.json.GetOrderJsonSupport.resultHandler
+    import demo.json.GetRequestJsonSupport.resultHandler
     Http()
       .singleRequest(request)
       .flatMap(_.entity.toStrict(2.seconds))
-      .flatMap(entity => Unmarshal(entity).to[GetOrder.Result])
+      .flatMap(entity => Unmarshal(entity).to[GetRequest.Result])
   }
 }

@@ -1,4 +1,4 @@
 package demo.model
 
-import demo.common.Id
+import _root_.demo.common.Id
 final case class UserId(value: String) extends AnyVal with Id

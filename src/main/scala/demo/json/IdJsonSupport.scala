@@ -1,14 +1,15 @@
 package demo.json
 
 import spray.json.JsonFormat
-import demo.model.ComplaintId
+import demo.model.StateId
 import demo.common.JsonSupport.idFormat
 import demo.model.UserId
-import demo.model.OrderId
+import demo.model.DiagramId
+import demo.state.persist.State
 
-object ComplaintIdJsonSupport {
-  implicit val formatComplaintId: JsonFormat[ComplaintId] =
-    idFormat[ComplaintId](ComplaintId.apply)
+object StateIdJsonSupport {
+  implicit val formatStateId: JsonFormat[StateId] =
+    idFormat[StateId](StateId.apply)
 }
 
 object UserIdJsonSupport {
@@ -16,7 +17,7 @@ object UserIdJsonSupport {
     idFormat[UserId](UserId.apply)
 }
 
-object OrderIdJsonSupport {
-  implicit val formatOrderId: JsonFormat[OrderId] =
-    idFormat[OrderId](OrderId.apply)
+object DiagramIdJsonSupport {
+  implicit val formatDiagramId: JsonFormat[DiagramId] =
+    idFormat[DiagramId](DiagramId.apply)
 }

@@ -17,7 +17,7 @@ class MongoConnector {
     Await.result(connection.flatMap(_.database("gapify")), 20.seconds)
   }
 
-  val complaints = getCol("complaints")
+  val states = getCol("states")
 
   def getCol(name: String): BSONCollection = {
     db.collection(name)

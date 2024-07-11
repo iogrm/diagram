@@ -1,25 +1,23 @@
 package demo.module
 
 import demo.persistence.RedisConnector
-import demo.module.ComplaintModule
-import demo.module.OrderModule
-import demo.module.DiagramModule
 import demo.persistence.MongoConnector
-import demo.service.ComplaintService
+import demo.service.StateService
 import com.redis.RedisClient
 import akka.http.scaladsl.server.Route
+import demo.manager.RequestManager
+import demo.persistence.repository.StateRepo
+import demo.api.controller.StateController
+import scala.concurrent.ExecutionContext
 
 class AppModule {
-  def build(): Route = {
-
+  def build: (Route, StateService) = {
     val connector = new MongoConnector()
     val redisClient = new RedisConnector().db
-    val (complaintRoute: Route, complaintService: ComplaintService) =
-      new ComplaintModule(connector).build()
-    val orderService = new OrderModule().build()
-    val diagramRoute =
-      new DiagramModule(complaintService, orderService, redisClient).build()
-    val route: Route = diagramRoute
-    route
+    val manager = new RequestManager()
+    val stateRepo = new StateRepo(connector)
+    val stateService = new StateService(redisClient, stateRepo, manager)
+    val route = new StateController(stateService).route
+    (route, stateService)
   }
 }
