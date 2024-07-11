@@ -6,6 +6,7 @@ import demo.common.JsonSupport.idFormat
 import demo.model.UserId
 import demo.model.DiagramId
 import demo.state.persist.State
+import demo.model.MessageId
 
 object StateIdJsonSupport {
   implicit val formatStateId: JsonFormat[StateId] =
@@ -20,4 +21,9 @@ object UserIdJsonSupport {
 object DiagramIdJsonSupport {
   implicit val formatDiagramId: JsonFormat[DiagramId] =
     idFormat[DiagramId](DiagramId.apply)
+}
+
+object MessageIdJsonSupport {
+  implicit val formatMessageId: JsonFormat[MessageId] =
+    idFormat[MessageId](MessageId.apply)
 }

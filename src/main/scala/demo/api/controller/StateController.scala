@@ -23,49 +23,6 @@ class StateController(service: StateService) {
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  // private val stateRoute: Route = pathPrefix("api" / "state") {
-
-  //   import demo.json.StateJsonSupport.format
-  //   path("add") {
-  //     post {
-  //       entity(as[StateEntity]) { body =>
-  //         val state = service.addState(body)
-  //         onComplete(state) {
-  //           case Success(value) => complete(value)
-  //           case Failure(ex) =>
-  //             ex.printStackTrace()
-  //             log.error(s"Failed to process due to ", ex)
-  //             complete(
-  //               status = StatusCodes.InternalServerError,
-  //               "Failed to execute"
-  //             )
-  //         }
-  //       }
-  //     }
-  //   } ~ path("all") {
-  //     get {
-
-  //       import GetStateJsonSupport.{resultHandler}
-  //       onComplete(service.getAll()) {
-  //         case Success(value) =>
-  //           complete(value)
-
-  //         case Failure(ex) =>
-  //           ex.printStackTrace()
-  //           log.error(s"Failed to process due to ", ex)
-  //           complete(
-  //             status = StatusCodes.InternalServerError,
-  //             "Failed to execute"
-  //           )
-  //       }
-  //     }
-  //   } ~ path(RemainingPath) {
-  //     case (id) => {
-  //       import GetStateJsonSupport.resultHandler
-  //       complete(service.getState(StateId(id.toString())))
-  //     }
-  //   }
-  // }
   import GetStateJsonSupport.{resultHandler}
 
   private val diagramRoute: Route =
@@ -86,7 +43,18 @@ class StateController(service: StateService) {
         }
       case None => complete(s"No user was provided")
     }
+  private val complaintRoute: Route =
+    pathPrefix("api" / "diagram") {
+      path("complaint") {
+        get {
+          import demo.json.AllMessageJsonSupport.handler
+          complete(
+            service.getComplaints()
+          )
+        }
+      }
+    }
 
-  val route = diagramRoute
+  val route = complaintRoute ~ diagramRoute
 
 }

@@ -18,6 +18,7 @@ class MongoConnector {
   }
 
   val states = getCol("states")
+  val messages = getCol("messages")
 
   def getCol(name: String): BSONCollection = {
     db.collection(name)

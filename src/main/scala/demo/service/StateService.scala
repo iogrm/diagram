@@ -18,11 +18,17 @@ import demo.state.persist.StateEntity
 import demo.json.CacheStateJsonSupport.format
 import demo.manager.RequestManager
 import demo.model.CacheState
+import demo.persistence.repository.MessageRepo
+import demo.state.persist.MessageEntity
+import demo.model.MessageId
+import demo.api.dto.AllMessage
+import demo.api.dto.GetMessage
 
 class StateService(
     redisRepo: RedisClient,
-    repo: StateRepo,
-    manager: RequestManager
+    stateRepo: StateRepo,
+    manager: RequestManager,
+    messageRepo: MessageRepo
 ) {
 
   def command(userId: UserId, diagramId: DiagramId, param: DiagramDto.Param)(
@@ -53,7 +59,15 @@ class StateService(
               else
                 state.tag match {
                   case "State" => {
-                    recordState(state)
+                    recordState(
+                      MessageEntity(
+                        MessageId(randomId),
+                        userId,
+                        diagramId,
+                        state._id,
+                        param.message
+                      )
+                    )
                     setState(CacheState(userId, state.next.get, diagramId))
                     Future(state.response.get)
                   }
@@ -74,7 +88,7 @@ class StateService(
         })
       }
       case None => {
-        val startState = repo.getStartState(diagramId)
+        val startState = stateRepo.getStartState(diagramId)
         startState.andThen(x => {
           println("startState: ")
           println(x)
@@ -97,12 +111,16 @@ class StateService(
   ): Future[AddState.Result] = {
 
     for {
-      _ <- repo.insert(state)
+      _ <- stateRepo.insert(state)
     } yield AddState.Result(state._id)
 
   }
 
-  def recordState(state: StateEntity) {}
+  def recordState(message: MessageEntity)(implicit
+      ec: ExecutionContext
+  ) {
+    messageRepo.insert(message)
+  }
   def setState(state: CacheState) {
     redisRepo.set(
       state.userId,
@@ -113,14 +131,23 @@ class StateService(
   def getState(stateId: StateId)(implicit
       ec: ExecutionContext
   ): Future[Option[StateEntity]] = {
-    repo.getOne(stateId)
+    stateRepo.getOne(stateId)
 
   }
 
   def getAll()(implicit
       ec: ExecutionContext
   ): Future[List[StateEntity]] = {
-    repo.getAll()
+    stateRepo.getAll()
+  }
+
+  def getComplaints()(implicit
+      ec: ExecutionContext
+  ): Future[AllMessage.Result] = {
+    for {
+      messages <- messageRepo.getAllByStateId(StateId("3"))
+    } yield AllMessage.Result(messages)
+
   }
 
   def init(implicit
@@ -137,7 +164,7 @@ class StateService(
     val message5 = "شکایت شما در اسرع وقت بررسی میشود"
 
     val complaintSaved = StateEntity(
-      StateId(randomId),
+      StateId("1"),
       diagramId,
       "State",
       "complaintSaved",
@@ -148,7 +175,7 @@ class StateService(
       true
     )
     val orderTracking = StateEntity(
-      StateId(randomId),
+      StateId("2"),
       diagramId,
       "State",
       "orderTracking",
@@ -159,7 +186,7 @@ class StateService(
       true
     )
     val getComplaint = StateEntity(
-      StateId(randomId),
+      StateId("3"),
       diagramId,
       "State",
       "getComplaint",
@@ -170,7 +197,7 @@ class StateService(
       false
     )
     val orderStatus = StateEntity(
-      StateId(randomId),
+      StateId("4"),
       diagramId,
       "Condition",
       "orderStatus",
@@ -181,7 +208,7 @@ class StateService(
       false
     )
     val receive = StateEntity(
-      StateId(randomId),
+      StateId("5"),
       diagramId,
       "State",
       "receive",

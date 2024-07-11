@@ -47,6 +47,6 @@ class StateRepo(connector: MongoConnector) {
     col
       .insert(false)
       .one(state)
-      .map(x => x)
+      .map(x => ())
   }
 }
